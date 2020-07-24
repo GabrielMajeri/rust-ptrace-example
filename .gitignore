@@ -1,0 +1,5 @@
+# Compiled Rust files
+/target/
+
+# Python virtual environment
+/.venv/
