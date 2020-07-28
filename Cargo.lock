@@ -21,8 +21,7 @@ checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 [[package]]
 name = "libc"
 version = "0.2.73"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd7d4bd64732af4bf3a67f367c27df8520ad7e230c5817b8ff485864d80242b9"
+source = "git+https://github.com/rust-lang/libc/#ac930a2536e430e745bfc1747285b38192f75cee"
 
 [[package]]
 name = "mlprofiler"
@@ -34,18 +33,10 @@ dependencies = [
 [[package]]
 name = "nix"
 version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e4785f2c3b7589a0d0c1dd60285e1188adac4006e8abd6dd578e1567027363"
+source = "git+https://github.com/GabrielMajeri/nix?branch=ptrace-interrupt#c6a03e7301ed973eb6fc5e5bf63b79101bf14619"
 dependencies = [
  "bitflags",
  "cc",
  "cfg-if",
  "libc",
- "void",
 ]
-
-[[package]]
-name = "void"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"

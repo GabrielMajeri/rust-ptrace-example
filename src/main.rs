@@ -1,11 +1,7 @@
-// TODO: add support for more `ptrace` functions to `nix`
-#![allow(deprecated)]
-
 use nix::sys::ptrace;
 use nix::unistd::{fork, ForkResult};
 use std::os::unix::process::CommandExt as _;
 use std::process::Command;
-use std::ptr;
 
 fn main() {
     match fork().expect("failed to fork profiler") {
@@ -23,69 +19,28 @@ fn main() {
 
             println!("Resuming child");
 
-            unsafe {
-                ptrace::ptrace(
-                    ptrace::Request::PTRACE_CONT,
-                    child,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                )
-                .expect("failed to resume child process");
-            }
+            ptrace::cont(child, None).unwrap();
 
-            let status = waitpid(child, None).expect("failed to wait for child");
+            let status = waitpid(child, None).unwrap();
             println!("{:?}", status);
 
-            unsafe {
-                ptrace::ptrace(
-                    ptrace::Request::PTRACE_CONT,
-                    child,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                )
-                .expect("failed to resume child process");
-            }
+            ptrace::cont(child, None).unwrap();
 
-            let status = waitpid(child, None).expect("failed to wait for child");
+            let status = waitpid(child, None).unwrap();
             println!("{:?}", status);
 
-            unsafe {
-                ptrace::ptrace(
-                    ptrace::Request::PTRACE_CONT,
-                    child,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                )
-                .expect("failed to resume child process");
-            }
+            ptrace::cont(child, None).unwrap();
 
             println!("Sleeping...");
 
             std::thread::sleep(std::time::Duration::from_secs(5));
 
-            unsafe {
-                ptrace::ptrace(
-                    ptrace::Request::PTRACE_INTERRUPT,
-                    child,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                )
-                .expect("failed to interrupt running child process");
-            }
-
+            ptrace::interrupt(child).unwrap();
             println!("child is stopped");
 
             std::thread::sleep(std::time::Duration::from_secs(5));
 
-            unsafe {
-                ptrace::ptrace(
-                    ptrace::Request::PTRACE_CONT,
-                    child,
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                )
-                .expect("failed to resume child process");
-            }
+            ptrace::cont(child, None).unwrap();
 
             println!("child is restarted");
 
