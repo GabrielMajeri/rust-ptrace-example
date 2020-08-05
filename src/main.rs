@@ -1,7 +1,27 @@
 use nix::sys::ptrace;
-use nix::unistd::{fork, ForkResult};
+use nix::unistd::{fork, ForkResult, Pid};
 use std::os::unix::process::CommandExt as _;
 use std::process::Command;
+
+fn read_stack(child: Pid) {
+    let registers = ptrace::getregs(child).expect("failed to read child registers");
+    let stack_pointer = registers.rsp;
+    println!("Child stack pointer is at: {:#X}", stack_pointer);
+
+    use nix::sys::uio::{process_vm_readv, IoVec, RemoteIoVec};
+    let mut buffer = [0u8; 4096];
+    process_vm_readv(
+        child,
+        &[IoVec::from_mut_slice(&mut buffer[..])],
+        &[RemoteIoVec {
+            base: stack_pointer as usize,
+            len: 4096,
+        }],
+    )
+    .expect("failed to read child stack");
+
+    println!("Top of child stack: {}", buffer[0]);
+}
 
 fn main() {
     match fork().expect("failed to fork profiler") {
@@ -16,6 +36,8 @@ fn main() {
 
             ptrace::seize(child, ptrace::Options::PTRACE_O_TRACEEXEC)
                 .expect("failed to attach (seize) the child process");
+
+            read_stack(child);
 
             println!("Resuming child");
 
