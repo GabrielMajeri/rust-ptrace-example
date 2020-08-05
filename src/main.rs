@@ -3,6 +3,19 @@ use nix::unistd::{fork, ForkResult, Pid};
 use std::os::unix::process::CommandExt as _;
 use std::process::Command;
 
+fn read_symbols(child: Pid) {
+    use std::fs;
+
+    let binary_path = format!("/proc/{}/exe", child);
+    let mut binary = fs::File::open(binary_path).expect("failed to open traced binary");
+
+    use std::io::Read;
+    let mut buffer = [0u8; 4];
+    binary.read_exact(&mut buffer).unwrap();
+    let magic = std::str::from_utf8(&buffer).unwrap();
+    println!("Binary magic number: {}", magic);
+}
+
 fn read_stack(child: Pid) {
     let registers = ptrace::getregs(child).expect("failed to read child registers");
     let stack_pointer = registers.rsp;
@@ -36,6 +49,8 @@ fn main() {
 
             ptrace::seize(child, ptrace::Options::PTRACE_O_TRACEEXEC)
                 .expect("failed to attach (seize) the child process");
+
+            read_symbols(child);
 
             read_stack(child);
 
