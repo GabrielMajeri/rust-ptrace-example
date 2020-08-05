@@ -1,19 +1,18 @@
-use nix::sys::ptrace;
-use nix::unistd::{fork, ForkResult, Pid};
 use std::os::unix::process::CommandExt as _;
 use std::process::Command;
 
+use nix::sys::ptrace;
+use nix::unistd::{fork, ForkResult, Pid};
+
 fn read_symbols(child: Pid) {
-    use std::fs;
-
     let binary_path = format!("/proc/{}/exe", child);
-    let mut binary = fs::File::open(binary_path).expect("failed to open traced binary");
+    let binary = std::fs::File::open(binary_path).expect("failed to open traced binary");
 
-    use std::io::Read;
-    let mut buffer = [0u8; 4];
-    binary.read_exact(&mut buffer).unwrap();
-    let magic = std::str::from_utf8(&buffer).unwrap();
-    println!("Binary magic number: {}", magic);
+    let mmap = unsafe { memmap::Mmap::map(&binary).unwrap() };
+
+    let binary = goblin::elf::Elf::parse(&mmap).expect("invalid ELF binary");
+
+    println!("ELF version {}", binary.header.e_version);
 }
 
 fn read_stack(child: Pid) {
