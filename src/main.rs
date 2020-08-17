@@ -4,15 +4,68 @@ use std::process::Command;
 use nix::sys::ptrace;
 use nix::unistd::{fork, ForkResult, Pid};
 
-fn read_symbols(child: Pid) {
-    let binary_path = format!("/proc/{}/exe", child);
-    let binary = std::fs::File::open(binary_path).expect("failed to open traced binary");
+/// Finds the base address at which a PIC binary was loaded.
+fn binary_base_address(child: Pid) -> u64 {
+    let binary_path = std::fs::read_link(format!("/proc/{}/exe", child))
+        .expect("failed to retrieve path of traced binary");
+    let binary_name = binary_path
+        .to_str()
+        .expect("binary name is not valid UTF-8");
 
-    let mmap = unsafe { memmap::Mmap::map(&binary).unwrap() };
+    let maps_path = format!("/proc/{}/maps", child);
+    let mappings = std::fs::File::open(maps_path).expect("failed to open memory mappings file");
+
+    use std::io::{BufRead, BufReader};
+    let reader = BufReader::new(mappings);
+    for line in reader.lines().map(Result::unwrap) {
+        if line.contains(binary_name) && line.contains("r-xp") {
+            let base_address = line
+                .split('-')
+                .next()
+                .expect("memory mapping file has invalid format");
+            let base_address = u64::from_str_radix(base_address, 16)
+                .expect("base address is not valid hexadecimal");
+            return base_address;
+        }
+    }
+    panic!("unable to find executable base address")
+}
+
+fn read_symbols(child: Pid) {
+    let image_path = format!("/proc/{}/exe", child);
+    let image = std::fs::File::open(&image_path).expect("failed to open traced binary");
+
+    let mmap = unsafe { memmap::Mmap::map(&image).unwrap() };
 
     let binary = goblin::elf::Elf::parse(&mmap).expect("invalid ELF binary");
 
     println!("ELF version {}", binary.header.e_version);
+
+    let is_pic = binary.header.e_type == goblin::elf::header::ET_DYN;
+    println!("Position Independent Code: {}", is_pic);
+
+    let interp_state_head = binary
+        .dynsyms
+        .iter()
+        .find(|symbol| {
+            if !symbol.is_function() {
+                return false;
+            }
+            let name = &binary.dynstrtab[symbol.st_name];
+            name == "PyInterpreterState_Head"
+        })
+        .expect("failed to find required Python symbol");
+
+    let offset = if is_pic {
+        binary_base_address(child)
+    } else {
+        0
+    };
+    let interp_state_head_address = interp_state_head.st_value + offset;
+    println!(
+        "PyInterpreterState_Head real address is {:#X}",
+        interp_state_head_address
+    );
 }
 
 fn read_stack(child: Pid) {
@@ -49,16 +102,16 @@ fn main() {
             ptrace::seize(child, ptrace::Options::PTRACE_O_TRACEEXEC)
                 .expect("failed to attach (seize) the child process");
 
-            read_symbols(child);
-
-            read_stack(child);
-
             println!("Resuming child");
 
             ptrace::cont(child, None).unwrap();
 
             let status = waitpid(child, None).unwrap();
-            println!("{:?}", status);
+            println!("Child succesfully exec'ed Python binary: {:?}", status);
+
+            read_symbols(child);
+
+            read_stack(child);
 
             ptrace::cont(child, None).unwrap();
 
