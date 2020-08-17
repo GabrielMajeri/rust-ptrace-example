@@ -31,6 +31,7 @@ fn binary_base_address(child: Pid) -> u64 {
     panic!("unable to find executable base address")
 }
 
+/// Finds the addresses of the symbols we need in the tracee.
 fn read_symbols(child: Pid) {
     let image_path = format!("/proc/{}/exe", child);
     let image = std::fs::File::open(&image_path).expect("failed to open traced binary");
@@ -68,6 +69,7 @@ fn read_symbols(child: Pid) {
     );
 }
 
+/// Reads the stack of the child process.
 fn read_stack(child: Pid) {
     let registers = ptrace::getregs(child).expect("failed to read child registers");
     let stack_pointer = registers.rsp;
@@ -89,16 +91,20 @@ fn read_stack(child: Pid) {
 }
 
 fn main() {
+    // Fork into tracer and tracee.
     match fork().expect("failed to fork profiler") {
         ForkResult::Parent { child } => {
             println!("I am the parent");
             println!("Child PID = {}", child);
 
+            // Wait for the child to stop.
             use nix::sys::wait::{waitpid, WaitPidFlag};
             waitpid(child, Some(WaitPidFlag::WUNTRACED)).expect("failed to wait for child");
 
             println!("Successfully waited for the child");
 
+            // Attach to the child process using `SEIZE`,
+            // which will allow us to interrupt its execution at will.
             ptrace::seize(child, ptrace::Options::PTRACE_O_TRACEEXEC)
                 .expect("failed to attach (seize) the child process");
 
@@ -139,6 +145,7 @@ fn main() {
         ForkResult::Child => {
             println!("I am the child");
 
+            // Pause the process to allow the parent to attach to us.
             use nix::sys::signal::{raise, Signal};
             raise(Signal::SIGSTOP).expect("failed to stop child process");
 
