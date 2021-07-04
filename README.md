@@ -1,6 +1,10 @@
-# Automated performance profiling using machine learning
+# Rust `ptrace` example
+
+This repo contains an example of using [the `ptrace` system call](https://en.wikipedia.org/wiki/Ptrace) from Rust to start and control the execution of a child process.
 
 ## Profiling flow
+
+The example was initially intended to become a statistic profiler. The current steps are:
 
 - The profiler main process starts.
 - The profiler forks itself.
